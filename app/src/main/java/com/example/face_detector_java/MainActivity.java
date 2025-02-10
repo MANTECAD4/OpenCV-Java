@@ -31,6 +31,7 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 
 import org.opencv.android.OpenCVLoader;
+import org.opencv.core.Core;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfRect;
 import org.opencv.core.Size;
@@ -145,7 +146,7 @@ public class MainActivity extends AppCompatActivity {
             Toast.makeText(this, "CascadeClassifier no cargado.", Toast.LENGTH_LONG).show();
             return;
         }
-
+        Core.flip(frame, frame, 1);
         Mat gray = new Mat();
         Imgproc.cvtColor(frame, gray, Imgproc.COLOR_RGBA2GRAY);
 
