@@ -26,7 +26,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 
-
+import org.opencv.android.OpenCVLoader;
 public class MainActivity extends AppCompatActivity {
 
     private ImageView frameView;
@@ -38,6 +38,11 @@ public class MainActivity extends AppCompatActivity {
 
         frameView = findViewById(R.id.frameView);
 
+        if (OpenCVLoader.initDebug()) {
+            Toast.makeText(this, "Open CV Instalado correctamente.", Toast.LENGTH_LONG).show();
+        } else {
+            Toast.makeText(this, "Open CV no detectado.", Toast.LENGTH_LONG).show();
+        }
         // Solicitar permiso de la cámara si no está concedido
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
                 != PackageManager.PERMISSION_GRANTED) {
