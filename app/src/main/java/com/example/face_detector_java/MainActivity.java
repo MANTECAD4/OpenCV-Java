@@ -2,12 +2,13 @@ package com.example.face_detector_java;
 
 import static androidx.camera.core.internal.utils.ImageUtil.rotateBitmap;
 import android.Manifest;
+import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.ImageFormat;
 import android.graphics.YuvImage;
-import android.graphics.Rect;
+//import android.graphics.Rect;
 import android.os.Bundle;
 import android.widget.ImageView;
 import android.widget.Toast;
@@ -24,12 +25,26 @@ import androidx.core.content.ContextCompat;
 import com.google.common.util.concurrent.ListenableFuture;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 
 import org.opencv.android.OpenCVLoader;
+import org.opencv.core.Mat;
+import org.opencv.core.MatOfRect;
+import org.opencv.core.Size;
+//import org.opencv.core.Rect;
+import org.opencv.core.Scalar;
+import org.opencv.android.Utils;
+import org.opencv.imgproc.Imgproc;
+import org.opencv.objdetect.CascadeClassifier;
+
+
 public class MainActivity extends AppCompatActivity {
 
     private ImageView frameView;
+    private CascadeClassifier faceCascade;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -50,6 +65,7 @@ public class MainActivity extends AppCompatActivity {
         } else {
             startCamera(); // Inicia la cámara si el permiso ya está concedido
         }
+        loadCascade();
     }
 
     @Override
@@ -97,29 +113,70 @@ public class MainActivity extends AppCompatActivity {
 
         Bitmap bitmap = imageProxyToBitmap(image);
 
-        // Convertir el frame a Bitmap
+        Mat mat = bitmapToMat(bitmap);             // Convierte Bitmap a Mat de OpenCV
 
-        byte[] imageBytes = bitmapToByteArray(bitmap);
+        detectFaces(mat);  // Aplica detección de rostros
 
-        Bitmap finalImage = bytesToBitmap(imageBytes);
+        Bitmap finalImage = matToBitmap(mat);  // Convierte el Mat procesado a Bitmap
+
         runOnUiThread(() -> frameView.setImageBitmap(finalImage));
 
         // Cierra el frame para liberar memoria
         image.close();
     }
 
-    public byte[] bitmapToByteArray(Bitmap bitmap) {
-        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-        bitmap.compress(Bitmap.CompressFormat.JPEG, 100, byteArrayOutputStream); // Comprimir en formato PNG
-        return byteArrayOutputStream.toByteArray();  // Regresar los bytes
+    // Convierte Bitmap a Mat
+    private Mat bitmapToMat(Bitmap bitmap) {
+        Mat mat = new Mat();
+        Bitmap bmp32 = bitmap.copy(Bitmap.Config.ARGB_8888, true);
+        Utils.bitmapToMat(bmp32, mat);
+        return mat;
     }
-    public Bitmap bytesToBitmap(byte[] imageBytes) {
-        // Convierte el arreglo de bytes en un Bitmap
-        Bitmap bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length);
-        if (bitmap == null) {
-            throw new IllegalArgumentException("No se pudo convertir los bytes a un Bitmap");
-        }
+
+    // Convierte Mat a Bitmap
+    private Bitmap matToBitmap(Mat mat) {
+        Bitmap bitmap = Bitmap.createBitmap(mat.cols(), mat.rows(), Bitmap.Config.ARGB_8888);
+        Utils.matToBitmap(mat, bitmap);
         return bitmap;
+    }
+
+    private void detectFaces(Mat frame) {
+        if (faceCascade == null) {
+            Toast.makeText(this, "CascadeClassifier no cargado.", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        Mat gray = new Mat();
+        Imgproc.cvtColor(frame, gray, Imgproc.COLOR_RGBA2GRAY);
+
+        MatOfRect faces = new MatOfRect();
+        faceCascade.detectMultiScale(gray, faces, 1.1, 5, 0, new Size(40, 40), new Size());
+
+        for (org.opencv.core.Rect rect : faces.toArray()) {
+            Imgproc.rectangle(frame, rect.tl(), rect.br(), new Scalar(0, 255, 0), 2);
+        }
+    }
+
+    private void loadCascade() {
+        try {
+            InputStream is = getResources().openRawResource(R.raw.haarcascade_frontalface_default);
+            File cascadeDir = getDir("cascade", Context.MODE_PRIVATE);
+            File cascadeFile = new File(cascadeDir, "haarcascade_frontalface_default.xml");
+
+            FileOutputStream os = new FileOutputStream(cascadeFile);
+            byte[] buffer = new byte[4096];
+            int bytesRead;
+            while ((bytesRead = is.read(buffer)) != -1) {
+                os.write(buffer, 0, bytesRead);
+            }
+            is.close();
+            os.close();
+
+            faceCascade = new CascadeClassifier(cascadeFile.getAbsolutePath());
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     private Bitmap imageProxyToBitmap(ImageProxy image) {
@@ -141,7 +198,7 @@ public class MainActivity extends AppCompatActivity {
         // Convertir NV21 a Bitmap
         YuvImage yuvImage = new YuvImage(nv21, ImageFormat.NV21, image.getWidth(), image.getHeight(), null);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        yuvImage.compressToJpeg(new Rect(0, 0, image.getWidth(), image.getHeight()), 100, out);
+        yuvImage.compressToJpeg(new android.graphics.Rect(0, 0, image.getWidth(), image.getHeight()), 100, out);
         byte[] jpegBytes = out.toByteArray();
         Bitmap bitmap = BitmapFactory.decodeByteArray(jpegBytes, 0, jpegBytes.length);
 
